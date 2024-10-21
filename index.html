@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://js.stripe.com/v3/"></script>
+    <title>Google Pay Integration</title>
+</head>
+<body>
+
+    <button id="google-pay-button">Pay</button>
+
+    <script>
+        // Initialize Stripe
+        const stripe = Stripe('pk_test_51PY8q92KNq3x4TpgZnJbxmyZiop53zyGIhR4CD1nY0rHaWlnzMpK7BPXwv26rsPZb8UZAwlvtDr4udpcWSWGPL4Q0027sG8vmq');
+
+        // Create a Payment Request for Google Pay
+        const paymentRequest = stripe.paymentRequest({
+            country: 'BD',
+            currency: 'usd',
+            total: {
+                label: 'Service Payment',
+                amount: 5000, // Amount in cents ($50.00)
+            },
+            requestPayerName: true,
+            requestPayerEmail: true,
+        });
+
+        // Check if the PaymentRequest is available for Google Pay
+        paymentRequest.canMakePayment({ googlePay: true }).then(function(result) {
+            if (result) {
+                // Create a Google Pay button if available
+                const googlePayButton = stripe.elements().create('paymentRequestButton', {
+                    paymentRequest: paymentRequest,
+                    style: {
+                        paymentRequestButton: {
+                            type: 'googlePay', // Display Google Pay Button
+                            theme: 'light',
+                        },
+                    },
+                });
+                googlePayButton.mount('#google-pay-button');
+            } else {
+                document.getElementById('google-pay-button').style.display = '';
+            }
+        });
+
+        // Handle Payment Request submission
+        paymentRequest.on('paymentmethod', async function(ev) {
+            // Send payment details to the backend
+            const response = await fetch('http://192.168.10.169:8081/api/v1/google-pay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: ev.paymentMethod.id, // The token received from Google Pay
+                    amount: 5000, // Amount in cents ($50.00)
+                    serviceId: 'your-service-id',
+                    tagNumber: 'your-tag-number',
+                    carModel: 'your-car-model',
+                    appointmentDate: 'your-appointment-date',
+                    location: 'your-location',
+                    description: 'your-description'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                ev.complete('success');
+                window.location.href = '/success'; 
+            } else {
+                ev.complete('fail');
+                window.location.href = '/error'; 
+            }
+        });
+    </script>
+
+</body>
+</html>
